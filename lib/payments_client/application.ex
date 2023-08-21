@@ -9,8 +9,6 @@ defmodule PaymentsClient.Application do
   @impl true
   def start(_type, _args) do
     children = [
-      # Starts a worker by calling: PaymentsClient.Worker.start_link(arg)
-      # {PaymentsClient.Worker, arg}
       {Task.Supervisor, name: RateLimiter.TaskSupervisor},
       {RateLimiter.get_rate_limiter(),
        %{

@@ -8,6 +8,11 @@ defmodule PaymentsClient.RateLimiters.LeakyBucket do
   @behaviour RateLimiter
 
   def start_link(opts) do
+    GenServer.start_link(__MODULE__, opts, name: __MODULE__)
+  end
+
+  @impl true
+  def init(opts) do
     state = %{
       request_queue: :queue.new(),
       request_queue_size: 0,
@@ -23,13 +28,14 @@ defmodule PaymentsClient.RateLimiters.LeakyBucket do
     {:ok, state, {:continue, :initial_timer}}
   end
 
-  # -------------- Client facing function --------------
+  # ---------------- Client facing function ----------------
+
   @impl RateLimiter
   def make_request(request_handler, response_handler) do
     GenServer.cast(__MODULE__, {:enqueue_request, request_handler, response_handler})
   end
 
-  # -------------- Server Callbacks --------------
+  # ---------------- Server Callbacks ----------------
 
   @impl true
   def handle_continue(:initial_timer, state) do
@@ -41,11 +47,12 @@ defmodule PaymentsClient.RateLimiters.LeakyBucket do
     updated_queue = :queue.in({request_handler, response_handler}, state.request_queue)
     new_queue_size = state.request_queue_size + 1
 
-    {:noreply, %{state | request_queue: updated_queue, request_size: new_queue_size}}
+    {:noreply, %{state | request_queue: updated_queue, request_queue_size: new_queue_size}}
   end
 
   @impl true
   def handle_info(:pop_from_request_queue, %{request_queue_size: 0} = state) do
+    # No work to do as the queue size is zero...schedule the next timer
     {:noreply, %{state | send_after_ref: schedule_timer(state.request_queue_poll_rate)}}
   end
 
@@ -70,7 +77,7 @@ defmodule PaymentsClient.RateLimiters.LeakyBucket do
        state
        | request_queue: new_request_queue,
          send_after_ref: schedule_timer(state.request_queue_poll_rate),
-         request_queue_size: state.request_queue_size(-1)
+         request_queue_size: state.request_queue_size - 1
      }}
   end
 
